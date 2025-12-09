@@ -1,3 +1,5 @@
+# Сссылки
+[Видеодемонстрация](https://drive.google.com/file/d/1NMDSwINgbavgApfCc_nOrVvX_P3YABzW/view?usp=sharing)
 # Lihgt sensor MCU
 Контроллер исполняет две команды: начало потоковой передачи и отправка одиночного значения.
 ```cpp
