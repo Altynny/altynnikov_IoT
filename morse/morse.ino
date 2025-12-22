@@ -22,6 +22,23 @@ volatile const char* currentMorseCode = nullptr;
 volatile uint8_t txState = 0;
 volatile unsigned long txTargetDuration = 0;
 
+volatile char buffer[6];
+volatile uint8_t bufferIdx = 0;
+volatile uint8_t currBit = 1;
+
+void addSignal(char signal) {
+  if (bufferIdx < 5) {
+    buffer[bufferIdx] = signal;
+    bufferIdx++;
+    buffer[bufferIdx] = '\0';
+  }
+}
+
+void resetBuffer() {
+  bufferIdx = 0;
+  buffer[0] = '\0';
+}
+
 // __Перевод__
 const char letterAlphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const char* morseAlphabet[] = {
@@ -38,6 +55,16 @@ const char* charToMorse(char c) {
     }
   }
   return nullptr;
+}
+
+void decodeBuffer() {
+  for (int i = 0; i < sizeof(morseAlphabet) / sizeof(morseAlphabet[0]); i++) {
+    if (strcmp((const char*)buffer, morseAlphabet[i]) == 0) {
+      Serial.print(letterAlphabet[i]);
+      return;
+    }
+  }
+  Serial.print("?");
 }
 
 void setup() {
@@ -65,6 +92,7 @@ ISR(TIMER2_COMPA_vect) {
       handleIdle();
       break;
     case READ:
+      handleRead();
       break;
     case WRITE:
       handleWrite();
@@ -86,6 +114,50 @@ void handleIdle() {
     tm = 0;
     currentMorseCode = nullptr;
     morseIdx = 0;
+  }
+}
+
+void handleRead() {
+  uint8_t inBit = digitalRead(rx);
+  
+  if (inBit == currBit) {
+    tm++;
+  } 
+  else {
+    if (currBit == 1) {
+      if (tm >= base - e && tm <= base + e) {
+        addSignal('.');
+        tm = 0;
+      } 
+      else if (tm >= 3 * base - e && tm <= 3 * base + e) {
+        addSignal('-');
+        tm = 0;
+      }
+    } 
+    else {
+      if (tm >= base - e && tm <= base + e) {
+        tm = 0;
+      } 
+      else if (tm >= 3 * base - e && tm <= 3 * base + e) {
+        decodeBuffer();
+        resetBuffer();
+        tm = 0;
+      } 
+      else if (tm >= 7 * base - e && tm <= 7 * base + e) {
+        decodeBuffer();
+        resetBuffer();
+        Serial.print(" ");
+        tm = 0;
+      } 
+      else if (tm >= 7 * base + e) {
+        decodeBuffer();
+        resetBuffer();
+        Serial.println();
+        tm = 0;
+        state = IDLE;
+      }
+    }
+    currBit = inBit;
   }
 }
 
