@@ -79,7 +79,7 @@ void setup() {
   TCNT2 = 0;
   OCR2A = 125;
   TCCR2A |= 1 << WGM21;
-  TCCR2B |= (1 << CS22) | (1 << CS20);
+  TCCR2B |= (1 << CS22) | (1 << CS20); // 128
   TIMSK2 |= 1 << OCIE2A;
   
   Serial.begin(9600);
@@ -124,31 +124,39 @@ void handleRead() {
     tm++;
   } 
   else {
+    // HIGH -> LOW
     if (currBit == 1) {
+      // 1 TU
       if (tm >= base - e && tm <= base + e) {
         addSignal('.');
         tm = 0;
       } 
+      // 3 TU
       else if (tm >= 3 * base - e && tm <= 3 * base + e) {
         addSignal('-');
         tm = 0;
       }
     } 
+    // LOW -> HIGH
     else {
+      // 1 TU - следующий символ Морзе
       if (tm >= base - e && tm <= base + e) {
         tm = 0;
-      } 
+      }
+      // 3 TU - следующий символ алфавита
       else if (tm >= 3 * base - e && tm <= 3 * base + e) {
         decodeBuffer();
         resetBuffer();
         tm = 0;
       } 
+      // 7 TU - пробел
       else if (tm >= 7 * base - e && tm <= 7 * base + e) {
         decodeBuffer();
         resetBuffer();
         Serial.print(" ");
         tm = 0;
-      } 
+      }
+      // >7TU - конец записи
       else if (tm >= 7 * base + e) {
         decodeBuffer();
         resetBuffer();
@@ -164,6 +172,7 @@ void handleRead() {
 void handleWrite() {
   tm++;
   
+  // Начало записи HIGH->LOW на 1 TU
   if (txState == 0) {
     digitalWrite(tx, LOW);
     txTargetDuration = base;
@@ -174,19 +183,22 @@ void handleWrite() {
     return;
   }
   
+  // Определение последующей записи в зависимости от символа строки
   if (txState == 1) {
     if (currentMorseCode == nullptr || currentMorseCode[morseIdx] == '\0') {
       if (outgoingIdx < outgoingLen) {
         char c = outgoingMessage[outgoingIdx];
         outgoingIdx++;
         
+        // Пробел LOW на 4 TU
         if (c == ' ') {
           digitalWrite(tx, LOW);
           txState = 4;
           txTargetDuration = 4 * base;
           tm = 0;
           return;
-        } 
+        }
+        // Получение кода символа для дальнейшней записи 
         else {
           currentMorseCode = charToMorse(c);
           morseIdx = 0;
@@ -194,7 +206,9 @@ void handleWrite() {
             return;
           }
         }
-      } 
+      }
+
+      // Конец записи LOW на >7 TU
       else {
         digitalWrite(tx, LOW);
         txTargetDuration = 8 * base;
@@ -204,6 +218,7 @@ void handleWrite() {
       }
     }
     
+    // Запись символа, хранящегося в currentMorseCode
     if (currentMorseCode != nullptr && currentMorseCode[morseIdx] != '\0') {
       char symbol = currentMorseCode[morseIdx];
       digitalWrite(tx, HIGH);
@@ -214,6 +229,7 @@ void handleWrite() {
     return;
   }
   
+  // Прекращение записи по достижению целевого TU
   if (txState == 2) {
     if (tm >= txTargetDuration) {
       digitalWrite(tx, LOW);
@@ -233,6 +249,7 @@ void handleWrite() {
     return;
   }
   
+  // Обнуление ссылки на код морзе по достижению его конца
   if (txState == 3) {
     if (tm >= txTargetDuration) {
       tm = 0;
@@ -247,6 +264,7 @@ void handleWrite() {
     return;
   }
   
+  // Прекращение записи пробела, начало записи следующего символа
   if (txState == 4) {
     if (tm >= txTargetDuration) {
       tm = 0;
@@ -255,6 +273,7 @@ void handleWrite() {
     return;
   }
   
+  // Конец передачи постоянный HIGH после LOW >7TU
   if (txState == 5) {
     if (tm >= txTargetDuration) {
       digitalWrite(tx, HIGH);
