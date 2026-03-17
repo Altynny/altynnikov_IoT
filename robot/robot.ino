@@ -1,3 +1,4 @@
+#include <SoftwareSerial.h>
 #define DIR_RIGHT 4
 #define SPEED_RIGHT 5
 
@@ -9,6 +10,8 @@
 #define BACKWARD_RIGHT HIGH
 #define BACKWARD_LEFT LOW
 
+SoftwareSerial mySerial(2, 3);
+
 void move(
   bool left_dir, int left_speed,
   bool right_dir, int right_speed
@@ -16,7 +19,11 @@ void move(
   digitalWrite(DIR_LEFT, left_dir);
   digitalWrite(DIR_RIGHT, right_dir);
   analogWrite(SPEED_LEFT, left_speed);
-  analogWrite(SPEED_RIGHT, right_speed*2);
+  analogWrite(SPEED_RIGHT, right_speed);
+}
+
+void stop() {
+  move(FORWARD_LEFT, 0, FORWARD_RIGHT, 0);
 }
 
 void forward(int speed) {
@@ -48,17 +55,36 @@ void setup() {
   pinMode(SPEED_RIGHT, OUTPUT);
   pinMode(DIR_LEFT, OUTPUT);
   pinMode(SPEED_LEFT, OUTPUT);
+  
+  Serial.begin(9600);
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for native USB port only
+  }
 
-  rotate_left(120);
-  delay(2000);
-  rotate_right(120);
-  delay(2000);
-  forward(100);
-  delay(1000);
-  backward(100);
-  delay(1000);
-  forward(0);
+  mySerial.begin(9600);
+  stop();
 }
 
 void loop() {
+  if (mySerial.available()) {
+    char command = mySerial.read();
+    Serial.write(command);
+    switch (command) {
+    case 'F': 
+      forward(200);
+      break;
+    case 'B': 
+      backward(200);
+      break;
+    case 'R': 
+      rotate_right(200);
+      break;
+    case 'L': 
+      rotate_left(200);
+      break;
+    case '0': 
+      stop();
+      break;
+    }
+  }
 }
